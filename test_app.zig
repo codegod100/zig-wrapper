@@ -2,17 +2,24 @@ const std = @import("std");
 const wry = @import("wry.zig");
 
 pub fn main() !void {
-    // Create an arena allocator for test
+    // Create an arena allocator
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    // Create a webview with a URL (this BLOCKS until window closes)
-    const url = "https://www.example.com";
-    std.debug.print("Creating webview with URL: {s}\n", .{url});
-    std.debug.print("Close the window to exit...\n", .{});
+    // Get absolute path to current directory
+    const current_dir = try std.fs.cwd().realpathAlloc(allocator, ".");
+    defer allocator.free(current_dir);
 
-    var webview = try wry.WebView.init(allocator, url);
+    // Construct file:// URL to HTML (add null terminator)
+    var html_buffer: [512]u8 = undefined;
+    const html_path = try std.fmt.bufPrintZ(&html_buffer, "file://{s}/frontend/index.html", .{current_dir});
+
+    std.debug.print("Creating webview with HTML frontend...\n", .{});
+    std.debug.print("HTML path: {s}\n", .{html_path});
+    std.debug.print("Close window to exit...\n", .{});
+
+    var webview = try wry.WebView.init(allocator, html_path);
     defer webview.deinit();
 
     // Run event loop (blocking call in init(), this is no-op)

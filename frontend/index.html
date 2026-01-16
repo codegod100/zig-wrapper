@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wry Zig Wrapper App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-card h2 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        .info-card p {
+            margin: 0;
+            color: #495057;
+            line-height: 1.6;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #d4edda;
+            border-radius: 10px;
+            color: #155724;
+        }
+
+        .status::before {
+            content: "✓";
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .tech-item {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+            color: #495057;
+            transition: all 0.2s;
+        }
+
+        .tech-item:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Wry Zig Wrapper</h1>
+            <p>Build desktop apps with Zig and Rust</p>
+        </div>
+
+        <div class="content">
+            <div class="info-card">
+                <h2>Application Status</h2>
+                <p>This app demonstrates the integration between Zig and Rust using the Wry library for creating desktop web applications.</p>
+            </div>
+
+            <div class="status">
+                <span id="status-text">Application running successfully</span>
+            </div>
+
+            <div class="tech-stack">
+                <div class="tech-item">Zig</div>
+                <div class="tech-item">Rust</div>
+                <div class="tech-item">Wry</div>
+                <div class="tech-item">WebView</div>
+                <div class="tech-item">HTML</div>
+                <div class="tech-item">JavaScript</div>
+            </div>
+
+            <div id="file-list" style="display: none; margin-top: 20px;">
+                <h3 style="color: #495057; margin-bottom: 15px;">Files in Current Directory:</h3>
+                <ul id="file-items" style="list-style: none; padding: 0; max-height: 200px; overflow-y: auto;">
+                </ul>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="testMessage()" style="flex: 1;">
+                    Test Communication
+                </button>
+                <button onclick="showFiles()" style="flex: 1;">
+                    Show Files
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
