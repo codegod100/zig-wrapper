@@ -9,7 +9,7 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-wry = { path = ".." }
+wry = "0.54"
 tao = "0.34"
 
 [target.'cfg(target_os = "linux")'.dependencies]
