@@ -4,31 +4,14 @@ zig-cache-*/
 zig-out/
 .zig-cache/
 
-# Compiled test binaries (keep test_app.zig but ignore compiled binaries)
+# Compiled test binaries (all our test files)
+test_*
 simple_test*
-test_check
-test_callconv*
-test_cdecl
-test_ffi
-test_func
-test_int_only
-test_libc
-test_load
-test_minimal
-test_ptr*
-test_shim*
-test_sysv
-wry_static*
-wry_window_test
-wry_test*
-test_fixed_app
-test_dlsym_working
-test_c_wrap
-test_c_wrap_libc
-test_final_working
-wry_dlopen.o
-wry_dlopen.c
-wry_dlopen_obj.o
+
+# Object files
+*.o
+*.a
+*.so.*
 
 # Keep main files
 !test_app.zig
@@ -38,18 +21,7 @@ wry_dlopen_obj.o
 target/
 Cargo.lock
 
-# Temporary test files
-test_app_fixed.zig
-test_app_working.zig
-test_manual_dlopen.zig
-test_dlopen_final.zig
-test_dlopen_simple.zig
-test_working.zig
-test_final.zig
-test_dynlib.zig
-test_load.zig
-test_load_fixed.zig
-simple_test_fixed.zig
-
-# Old test build scripts
+# Build scripts
 build_test.zig
+build_*.zig
+manual_build.sh
