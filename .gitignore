@@ -1,0 +1,19 @@
+# Zig build artifacts
+zig-cache/
+zig-cache-*/
+zig-out/
+.zig-cache/
+
+# Compiled binaries
+test_*
+simple_test*
+test_app
+*_fixed
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Build scripts
+*.sh
+build.zig
