@@ -1,8 +1,10 @@
 # Zig build artifacts
 zig-cache/
 zig-cache-*/
-zig-out/
 .zig-cache/
+
+# Zig output directories
+zig-out/
 
 # Compiled test binaries (all our test files)
 test_*
@@ -19,9 +21,8 @@ simple_test*
 
 # Rust build artifacts
 target/
-Cargo.lock
 
-# Build scripts
+# Build scripts and test files
 build_test.zig
 build_*.zig
 manual_build.sh
