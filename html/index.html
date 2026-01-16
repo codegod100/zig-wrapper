@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wry Zig Wrapper App</title>
+    <title>Wry Zig Wrapper</title>
     <style>
         * {
             margin: 0;
@@ -147,7 +147,7 @@
         <div class="content">
             <div class="info-card">
                 <h2>Application Status</h2>
-                <p>This app demonstrates the integration between Zig and Rust using the Wry library for creating desktop web applications.</p>
+                <p>This app demonstrates integration between Zig and Rust using the Wry library for creating desktop web applications.</p>
             </div>
 
             <div class="status">
@@ -163,20 +163,9 @@
                 <div class="tech-item">JavaScript</div>
             </div>
 
-            <div id="file-list" style="display: none; margin-top: 20px;">
-                <h3 style="color: #495057; margin-bottom: 15px;">Files in Current Directory:</h3>
-                <ul id="file-items" style="list-style: none; padding: 0; max-height: 200px; overflow-y: auto;">
-                </ul>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button onclick="testMessage()" style="flex: 1;">
-                    Test Communication
-                </button>
-                <button onclick="showFiles()" style="flex: 1;">
-                    Show Files
-                </button>
-            </div>
+            <button onclick="testMessage()">
+                Test Communication
+            </button>
         </div>
     </div>
 
