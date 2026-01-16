@@ -1,144 +1,116 @@
 # Wry Zig Wrapper
 
-A Zig wrapper for the Wry cross-platform WebView library.
+Build system for creating Zig applications with Wry (Rust WebView library).
 
-## Build Status
+## Prerequisites
 
-✅ **Successfully Built and Compiled**
+- Zig 0.15.0 or later
+- Rust toolchain
+- GTK 3 development libraries
+- WebKitGTK 4.1 development libraries
 
-The Zig wrapper has been successfully created and compiled:
-
-- **Rust C ABI Wrapper**: ✅ Compiled (`libwry_zig_wrapper.so`, 1.3MB)
-- **Zig Bindings**: ✅ Created (`wry.zig`)
-- **Test Applications**: ✅ Built (`simple_test`, `test_app`)
-- **Build System**: ✅ Configured
-
-See [FINAL_README.md](FINAL_README.md) for detailed implementation status.
-
-## Quick Start
-
-### Prerequisites
-
-- Rust toolchain (stable)
-- Zig compiler (0.15+)
-- Platform-specific dependencies (WebEngine on each platform)
-- **Graphical display environment** for testing
-
-### Simple Build (Recommended)
-
+On Ubuntu/Debian:
 ```bash
-# 1. Build Rust wrapper
-cargo build --release --lib --features gtk
-
-# 2. Copy library
-mkdir -p lib
-cp target/release/libwry_zig_wrapper.so lib/
-
-# 3. Build Zig test
-LIBRARY_PATH=lib zig build-exe simple_test.zig -I. --library wry_zig_wrapper -femit-bin=simple_test
-
-# 4. Run test (requires display environment)
-LD_LIBRARY_PATH=lib ./simple_test
+sudo apt install zig cargo libgtk-3-dev libwebkit2gtk-4.1-dev
 ```
 
-### Automated Build
+## Building
 
+### Build everything:
 ```bash
-chmod +x build.sh
-./build.sh
+zig build
 ```
 
-## API Usage
+This will:
+1. Compile the Rust library (wry) to `target/release/libwry_zig_wrapper.so`
+2. Compile the Zig application to `zig-out/bin/wry_window_app`
+3. Install both to `zig-out/` directory
 
-### Simplified API (Recommended)
+### Run the application:
+```bash
+# Method 1: With manual LD_LIBRARY_PATH
+LD_LIBRARY_PATH=zig-out/lib ./zig-out/bin/wry_window_app
 
-```zig
-const std = @import("std");
-
-extern fn wry_create_and_run(url: [*c]const u8) void;
-
-pub fn main() !void {
-    const url = "https://www.example.com";
-    std.debug.print("Creating webview with URL: {s}\n", .{url});
-
-    // This function is blocking - it will run until window is closed
-    wry_create_and_run(url);
-
-    std.debug.print("WebView closed\n", .{});
-}
+# Method 2: Using zig build run (requires zig-out in PATH)
+zig build run-local
 ```
 
-### Advanced API
+## Structure
 
-```zig
-const std = @import("std");
-const wry = @import("wry.zig");
-
-pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    // Create a webview
-    var webview = try wry.WebView.init(allocator, "https://www.example.com");
-    defer webview.deinit();
-
-    // Execute JavaScript
-    try webview.evaluateScript("console.log('Hello from Zig!');");
-
-    // Navigate to a different URL
-    try webview.setUrl("https://www.google.com");
-
-    // Run the event loop (blocking)
-    webview.run();
-}
+```
+├── build.zig                 # Zig build system
+├── Cargo.toml                # Rust package configuration
+├── wry.zig                  # Zig wrapper module
+├── test_app.zig             # Zig main application
+├── src/lib.rs               # Rust FFI wrapper
+├── target/release/
+│   └── libwry_zig_wrapper.so  # Compiled Rust library
+└── zig-out/
+    ├── bin/
+    │   └── wry_window_app   # Compiled Zig executable
+    └── lib/
+        └── libwry_zig_wrapper.so  # Installed Rust library
 ```
 
-## Platform Support
+## Important Notes
 
-The wrapper supports the same platforms as Wry:
-- Windows (WebView2)
-- macOS (WebKit)
-- Linux (WebKitGTK)
-- iOS
-- Android
+### Zig 0.15 PLT/GOT Bug Fix
 
-## Display Requirements
+This project uses `-lc` flag to fix a critical bug in Zig 0.15 where
+dynamic symbols were not properly resolved, causing segfaults at address 0x0.
 
-**Important**: This wrapper requires a graphical display environment:
+The fix is applied automatically by the build system (see `exe.linkSystemLibrary("c")`).
 
-- **Linux**: Requires X11 (`DISPLAY`) or Wayland (`WAYLAND_DISPLAY`) environment variable
-- **Windows/macOS**: Requires GUI session
-- **Headless environments**: Wrapper includes safety checks and will gracefully report requirements
+Reference: https://github.com/ziglang/zig/issues/12010
 
-The wrapper automatically detects display availability and provides informative error messages in headless environments.
+### Dynamic Linking Only
 
-## Implementation Features
+**Static linking is not supported** because:
+- GTK and WebKitGTK do not support static linking
+- glibc is not designed for static linking (NSS, symbol versioning)
+- Would require hundreds of megabytes of bundled libraries
 
-- ✅ Cross-platform C ABI
-- ✅ Zig-compatible bindings
-- ✅ Memory-safe interface
-- ✅ Display environment checks
-- ✅ Error handling
-- ✅ Simplified blocking API
-- ✅ Event loop management
+The dynamic linking approach used here is:
+- ✅ Works with Zig 0.15
+- ✅ Uses system GTK/WebKit (no need to bundle)
+- ✅ Small executable size
+- ✅ Easy to distribute
 
-## Next Steps
+## Distribution
 
-For production use, see [FINAL_README.md](FINAL_README.md) for:
+When distributing your app, you need to ship:
 
-- Thread safety implementation
-- Advanced error handling
-- JavaScript integration
-- Event callback system
-- Complete API reference
+1. The Zig executable: `zig-out/bin/wry_window_app`
+2. The Rust library: `zig-out/lib/libwry_zig_wrapper.so`
+3. Instructions to set `LD_LIBRARY_PATH` to find the library
 
-## Files Created
+Example:
+```bash
+# Install to /opt/myapp/
+cp zig-out/bin/wry_window_app /opt/myapp/
+cp zig-out/lib/libwry_zig_wrapper.so /opt/myapp/
 
-- `src/lib.rs` - Rust C ABI wrapper
-- `wry.zig` - Zig bindings
-- `simple_test.zig` - Simple test application
-- `test_app.zig` - Comprehensive test application
-- `build.sh` - Automated build script
-- `build.zig` - Zig build configuration
-- `FINAL_README.md` - Detailed implementation status
+# Users run with:
+LD_LIBRARY_PATH=/opt/myapp /opt/myapp/wry_window_app
+```
+
+## Development
+
+To use in your own Zig project:
+
+1. Copy `wry.zig` to your project
+2. Add to your `build.zig`:
+   ```zig
+   const wry_module = b.createModule(.{
+       .root_source_file = b.path("wry.zig"),
+   });
+   exe.root_module.addImport("wry", wry_module);
+   
+   exe.linkSystemLibrary("wry_zig_wrapper");
+   exe.addLibraryPath(.{ .cwd_relative = "path/to/target/release" });
+   exe.linkSystemLibrary("c"); // IMPORTANT: Fix for Zig 0.15
+   ```
+
+## License
+
+This wrapper is MIT licensed. The underlying wry library is also MIT licensed.
