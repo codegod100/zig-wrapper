@@ -27,6 +27,13 @@ pub extern "C" fn wry_test_simple() -> i32 {
     42
 }
 
+/// Export function pointer for Zig
+#[no_mangle]
+pub extern "C" fn wry_test_simple_ptr() -> *const fn() -> i32 {
+    // Force function pointer type to avoid ambiguity
+    unsafe { std::mem::transmute(wry_test_simple as *const fn() -> i32) }
+}
+
 /// Simple test function that takes and returns integer
 #[no_mangle]
 pub extern "C" fn wry_test_with_param(x: i32) -> i32 {

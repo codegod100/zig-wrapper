@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub const WebViewWrapper = opaque {};
 
-extern fn wry_test_simple() i32;
+extern fn get_wry_test_simple() [*c]const u8;
 extern fn wry_test_with_param(x: i32) i32;
 extern fn wry_test_string(output: [*c]u8, len: usize) i32;
 extern fn wry_create_and_run(url: [*c]const u8) void;
