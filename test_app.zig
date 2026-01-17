@@ -1,5 +1,83 @@
 const std = @import("std");
-const wry = @import("wry.zig");
+
+// Inline wry module to bypass caching
+
+// Rust function declarations
+extern fn wry_create_and_run(url: [*c]const u8) void;
+
+// File entry structure
+pub const FileEntry = struct {
+    name: []const u8,
+    is_dir: bool,
+    size: ?u64,
+};
+
+pub fn listFiles(allocator: std.mem.Allocator, path: []const u8) ![]FileEntry {
+    var dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
+    defer dir.close();
+
+    var entries = std.ArrayList(FileEntry).init(allocator);
+    defer entries.deinit(allocator);
+
+    var iter = dir.iterate();
+    while (try iter.next()) |entry| {
+        const file_path = try std.fs.path.join(allocator, &.{ path, entry.name });
+        defer allocator.free(file_path);
+
+        const stat = std.fs.cwd().statFile(file_path) catch |err| {
+            std.debug.print("Warning: could not stat {s}: {}\\n", .{ file_path, err });
+            continue;
+        };
+
+        const file_entry = try allocator.create(FileEntry);
+        file_entry.* = FileEntry{
+            .name = try allocator.dupe(u8, entry.name),
+            .is_dir = entry.kind == .directory,
+            .size = if (entry.kind == .directory) null else stat.size,
+        };
+
+        try entries.append(allocator, file_entry.*);
+    }
+
+    // Sort: directories first, then files
+    std.sort.insertion(FileEntry, entries.items, {}, struct {
+        fn lessThan(_: void, a: FileEntry, b: FileEntry) bool {
+            if (a.is_dir and !b.is_dir) return true;
+            if (!a.is_dir and b.is_dir) return false;
+            return std.mem.lessThan(u8, a.name, b.name);
+        }
+    }.lessThan);
+
+    return try entries.toOwnedSlice(allocator);
+}
+
+// Simple blocking webview API
+pub const WebView = struct {
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator, url: []const u8) !WebView {
+        // Convert URL to C string
+        const url_c = try allocator.dupeZ(u8, url);
+        defer allocator.free(url_c);
+
+        // Note: wry_create_and_run is BLOCKING - it won't return until window closes
+        wry_create_and_run(url_c);
+
+        return WebView{
+            .allocator = allocator,
+        };
+    }
+
+    pub fn run(self: *WebView) void {
+        // No-op: blocking version runs everything in init()
+        _ = self;
+    }
+
+    pub fn deinit(self: *WebView) void {
+        // No-op: blocking version cleans up automatically
+        _ = self;
+    }
+};
 
 pub fn main() !void {
     // Create an arena allocator
@@ -7,12 +85,20 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
+    // Parse query parameters for directory path
+    var dir_path: []const u8 = ".";
+    const query = try parseQueryParams(allocator);
+    if (query.get("dir")) |path| {
+        dir_path = path;
+    }
+    defer if (query.get("dir")) |path| allocator.free(path);
+
     // Get absolute path to current directory
-    const current_dir = try std.fs.cwd().realpathAlloc(allocator, ".");
+    const current_dir = try std.fs.cwd().realpathAlloc(allocator, dir_path);
     defer allocator.free(current_dir);
 
     // Get file list
-    const files = try wry.listFiles(allocator, ".");
+    const files = try listFiles(allocator, dir_path);
     defer {
         for (files) |file| {
             allocator.free(file.name);
@@ -20,8 +106,35 @@ pub fn main() !void {
         allocator.free(files);
     }
 
-    // Generate HTML with file list
-    const html = try generateHTML(allocator, files);
+    // Build directory path parts for dropdown
+    var accumulated_path = std.ArrayList(u8).init(allocator);
+    defer accumulated_path.deinit(allocator);
+
+    var path_parts = std.ArrayList(struct { name: []const u8, fullPath: []const u8 }).init(allocator);
+    defer {
+        for (path_parts.items) |p| {
+            allocator.free(p.name);
+            allocator.free(p.fullPath);
+        }
+        path_parts.deinit(allocator);
+    }
+
+    var it = std.mem.tokenizeScalar(u8, current_dir, std.fs.path.sep);
+    while (it.next()) |part| {
+        if (accumulated_path.items.len > 0) {
+            try accumulated_path.append(allocator, std.fs.path.sep);
+        }
+        try accumulated_path.appendSlice(allocator, part);
+        const full_path = try allocator.dupe(u8, accumulated_path.items);
+        try path_parts.append(allocator, .{ .name = part, .fullPath = full_path });
+    }
+
+    // Generate file data JSON
+    const json = try generateFileDataJSON(allocator, files, current_dir, path_parts.items);
+    defer allocator.free(json);
+
+    // Generate HTML with Preact and file data
+    const html = try generateHTMLWithData(allocator, json);
     defer allocator.free(html);
 
     // Create zig-cache directory if it doesn't exist
@@ -33,80 +146,80 @@ pub fn main() !void {
     const tmp_filename = "zig-cache/tmp_frontend.html";
     try std.fs.cwd().writeFile(.{ .sub_path = tmp_filename, .data = html });
 
-    // Construct file:// URL
-    const url = try std.fmt.allocPrint(allocator, "file://{s}/zig-cache/tmp_frontend.html", .{current_dir});
+    // Construct file:// URL with query parameter
+    const url = try std.fmt.allocPrint(allocator, "file://{s}/zig-cache/tmp_frontend.html?dir={s}", .{ current_dir, try std.uri.encodeComponent(current_dir) });
     defer allocator.free(url);
 
-    std.debug.print("Creating webview with file list...\n", .{});
-    std.debug.print("Close window to exit...\n", .{});
+    std.debug.print("Creating webview with file list...\\n", .{});
+    std.debug.print("Close window to exit...\\n", .{});
 
-    var webview = try wry.WebView.init(allocator, url);
+    var webview = try WebView.init(allocator, url);
     defer webview.deinit();
 
-    std.debug.print("Waiting for window to close...\n", .{});
+    std.debug.print("Waiting for window to close...\\n", .{});
     webview.run();
 
-    std.debug.print("Window closed, exiting...\n", .{});
+    std.debug.print("Window closed, exiting...\\n", .{});
 }
 
-fn generateHTML(allocator: std.mem.Allocator, files: []const wry.FileEntry) ![]u8 {
-    var html_buffer: std.ArrayListAligned(u8, null) = .empty;
-    defer html_buffer.deinit(allocator);
+fn parseQueryParams(allocator: std.mem.Allocator) !std.StringHashMap([]const u8) {
+    const result = std.StringHashMap([]const u8).init(allocator);
+    // For simplicity, we'll parse the URL from the file system in production
+    return result;
+}
 
-    try html_buffer.appendSlice(allocator, "<!DOCTYPE html>\n");
-    try html_buffer.appendSlice(allocator, "<html lang=\"en\">\n");
-    try html_buffer.appendSlice(allocator, "<head>\n");
-    try html_buffer.appendSlice(allocator, "<meta charset=\"UTF-8\">\n");
-    try html_buffer.appendSlice(allocator, "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
-    try html_buffer.appendSlice(allocator, "<title>File Browser</title>\n");
-    try html_buffer.appendSlice(allocator, "<style>\n");
-    try html_buffer.appendSlice(allocator, "    * { margin: 0; padding: 0; box-sizing: border-box; }\n");
-    try html_buffer.appendSlice(allocator, "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }\n");
-    try html_buffer.appendSlice(allocator, "    .container { background: rgba(255, 255, 255, 0.95); border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 800px; width: 100%; margin: 0 auto; overflow: hidden; }\n");
-    try html_buffer.appendSlice(allocator, "    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }\n");
-    try html_buffer.appendSlice(allocator, "    .header h1 { margin: 0; font-size: 28px; font-weight: 700; }\n");
-    try html_buffer.appendSlice(allocator, "    .header p { margin: 10px 0 0 0; opacity: 0.9; }\n");
-    try html_buffer.appendSlice(allocator, "    .content { padding: 30px; max-height: 70vh; overflow-y: auto; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-list { list-style: none; padding: 0; margin: 0; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #e9ecef; transition: background 0.2s; cursor: pointer; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-item:hover { background: #f8f9fa; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-icon { font-size: 24px; margin-right: 15px; width: 40px; text-align: center; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-info { flex: 1; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-name { font-weight: 600; color: #495057; margin-bottom: 4px; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-meta { font-size: 12px; color: #6c757d; }\n");
-    try html_buffer.appendSlice(allocator, "    .file-size { color: #667eea; }\n");
-    try html_buffer.appendSlice(allocator, "</style>\n");
-    try html_buffer.appendSlice(allocator, "</head>\n");
-    try html_buffer.appendSlice(allocator, "<body>\n");
-    try html_buffer.appendSlice(allocator, "    <div class=\"container\">\n");
-    try html_buffer.appendSlice(allocator, "        <div class=\"header\">\n");
-    try html_buffer.appendSlice(allocator, "            <h1>📁 File Browser</h1>\n");
-    try html_buffer.appendSlice(allocator, "            <p>Files in current directory</p>\n");
-    try html_buffer.appendSlice(allocator, "        </div>\n");
-    try html_buffer.appendSlice(allocator, "        <div class=\"content\">\n");
-    try html_buffer.appendSlice(allocator, "            <ul class=\"file-list\">\n");
+fn generateFileDataJSON(allocator: std.mem.Allocator, files: []const FileEntry, current_dir: []const u8, path_parts: []const struct { name: []const u8, fullPath: []const u8 }) ![]u8 {
+    var buffer = std.ArrayList(u8).init(allocator);
+    defer buffer.deinit(allocator);
 
-    for (files) |file| {
-        const icon = if (file.is_dir) "📁" else "📄";
-        const size_str = if (file.size) |s| try std.fmt.allocPrint(allocator, "{d} bytes", .{s}) else "";
-        defer if (file.size != null) allocator.free(size_str);
+    try buffer.writer(allocator).print("{{\\n", .{});
+    try buffer.writer(allocator).print("  \"currentPath\": \"{s}\",\\n", .{std.json.escapeString(allocator, current_dir)});
+    try buffer.writer(allocator).print("  \"directoryPathParts\": [\\n", .{});
 
-        try html_buffer.writer(allocator).print(
-            \\                <li class="file-item">
-            \\                    <div class="file-icon">{s}</div>
-            \\                    <div class="file-info">
-            \\                        <div class="file-name">{s}</div>
-            \\                        <div class="file-meta">{s}</div>
-            \\                    </div>
-            \\                </li>
-        , .{ icon, file.name, size_str });
+    for (path_parts, 0..) |part, i| {
+        if (i > 0) try buffer.writer(allocator).print("    ,\\n", .{});
+        try buffer.writer(allocator).print("    {{ \"name\": \"{s}\", \"fullPath\": \"{s}\" }}\\n", .{ std.json.escapeString(allocator, part.name), std.json.escapeString(allocator, part.fullPath) });
     }
 
-    try html_buffer.appendSlice(allocator, "            </ul>\n");
-    try html_buffer.appendSlice(allocator, "        </div>\n");
-    try html_buffer.appendSlice(allocator, "    </div>\n");
-    try html_buffer.appendSlice(allocator, "</body>\n");
-    try html_buffer.appendSlice(allocator, "</html>\n");
+    try buffer.writer(allocator).print("  ],\\n", .{});
+    try buffer.writer(allocator).print("  \"files\": [\\n", .{});
 
-    return try html_buffer.toOwnedSlice(allocator);
+    for (files, 0..) |file, i| {
+        if (i > 0) try buffer.writer(allocator).print("    ,\\n", .{});
+        const full_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ current_dir, file.name });
+        defer allocator.free(full_path);
+        const size_str: []const u8 = if (file.size) |s|
+            try std.fmt.allocPrint(allocator, "{d}", .{s})
+        else
+            "null";
+        defer if (file.size != null) allocator.free(size_str);
+        try buffer.writer(allocator).print("    {{ \"name\": \"{s}\", \"isDir\": {s}, \"size\": {s}, \"fullPath\": \"{s}\" }}\\n", .{ std.json.escapeString(allocator, file.name), if (file.is_dir) "true" else "false", size_str, std.json.escapeString(allocator, full_path) });
+    }
+
+    try buffer.writer(allocator).print("  ]\\n", .{});
+    try buffer.writer(allocator).print("}}\\n", .{});
+
+    return buffer.toOwnedSlice(allocator);
+}
+
+fn generateHTMLWithData(allocator: std.mem.Allocator, json_data: []const u8) ![]u8 {
+    // Read HTML template file
+    const template_path = try std.fs.path.join(allocator, &.{ ".", "html", "file_browser.html" });
+    defer allocator.free(template_path);
+
+    const template_content = try std.fs.cwd().readFileAlloc(allocator, template_path, 1024 * 1024);
+    defer allocator.free(template_content);
+
+    // Replace {{FILE_DATA}} placeholder with JSON data
+    const placeholder = "{{FILE_DATA}}";
+    const placeholder_index = std.mem.indexOf(u8, template_content, placeholder) orelse return error.PlaceholderNotFound;
+
+    var html_buffer = std.ArrayList(u8).init(allocator);
+    defer html_buffer.deinit(allocator);
+
+    try html_buffer.appendSlice(allocator, template_content[0..placeholder_index]);
+    try html_buffer.appendSlice(allocator, json_data);
+    try html_buffer.appendSlice(allocator, template_content[placeholder_index + placeholder.len ..]);
+
+    return html_buffer.toOwnedSlice(allocator);
 }

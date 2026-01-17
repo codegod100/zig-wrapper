@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Browser</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { background: rgba(255, 255, 255, 0.95); border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-width: 800px; width: 100%; margin: 0 auto; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+        .header p { margin: 10px 0 0 0; opacity: 0.9; }
+        .content { padding: 30px; max-height: 70vh; overflow-y: auto; }
+        .file-list { list-style: none; padding: 0; margin: 0; }
+        .file-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #e9ecef; transition: background 0.2s; cursor: pointer; }
+        .file-item:hover { background: #f8f9fa; }
+        .file-icon { font-size: 24px; margin-right: 15px; width: 40px; text-align: center; }
+        .file-info { flex: 1; }
+        .file-name { font-weight: 600; color: #495057; margin-bottom: 4px; }
+        .file-meta { font-size: 12px; color: #6c757d; }
+        .file-size { color: #667eea; }
+        .breadcrumb { display: flex; align-items: center; gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 10px; margin-bottom: 20px; }
+        .breadcrumb-label { font-weight: 600; color: #495057; font-size: 14px; }
+        .breadcrumb-dropdown { flex: 1; position: relative; }
+        .breadcrumb-select { width: 100%; padding: 10px 12px; border: 1px solid #dee2e6; border-radius: 8px; font-size: 14px; background: white; cursor: pointer; color: #495057; }
+        .breadcrumb-select:hover { border-color: #667eea; }
+        .breadcrumb-select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📁 File Browser</h1>
+            <p>Files in current directory</p>
+        </div>
+        <div class="content" id="app"></div>
+    </div>
+
+    <script>
+        // File data injected from Zig
+        let fileData = {{FILE_DATA}};
+
+        function navigateTo(path) {
+            console.log("Navigating to:", path);
+            if (window.ipc && window.ipc.postMessage) {
+                window.ipc.postMessage(path);
+            } else {
+                console.error("IPC not available");
+                // window.location.href = '?dir=' + encodeURIComponent(path);
+            }
+        }
+
+        window.addEventListener('FILE_DATA_UPDATE', (e) => {
+            console.log("Received FILE_DATA_UPDATE", e.detail);
+            fileData = e.detail;
+            render();
+        });
+
+        function render() {
+            const app = document.getElementById('app');
+            app.innerHTML = '';
+
+            // Breadcrumb
+            const breadcrumb = document.createElement('div');
+            breadcrumb.className = 'breadcrumb';
+            
+            const label = document.createElement('span');
+            label.className = 'breadcrumb-label';
+            label.textContent = '📂 Current Directory:';
+            breadcrumb.appendChild(label);
+
+            const dropdownDiv = document.createElement('div');
+            dropdownDiv.className = 'breadcrumb-dropdown';
+            
+            const select = document.createElement('select');
+            select.className = 'breadcrumb-select';
+            select.onchange = (e) => {
+                if (e.target.value) {
+                    navigateTo(e.target.value);
+                }
+            };
+
+            // Current path option
+            const currentOpt = document.createElement('option');
+            currentOpt.value = fileData.currentPath;
+            currentOpt.textContent = fileData.currentPath;
+            currentOpt.selected = true;
+            select.appendChild(currentOpt);
+
+            // Path parts options
+            fileData.directoryPathParts.forEach(part => {
+                const opt = document.createElement('option');
+                opt.value = part.fullPath;
+                opt.textContent = part.name;
+                select.appendChild(opt);
+            });
+
+            dropdownDiv.appendChild(select);
+            breadcrumb.appendChild(dropdownDiv);
+            app.appendChild(breadcrumb);
+
+            // File List
+            const ul = document.createElement('ul');
+            ul.className = 'file-list';
+
+            fileData.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                if (file.isDir) {
+                    li.onclick = () => {
+                        navigateTo(file.fullPath);
+                    };
+                }
+
+                const icon = document.createElement('div');
+                icon.className = 'file-icon';
+                icon.textContent = file.isDir ? '📁' : '📄';
+                li.appendChild(icon);
+
+                const info = document.createElement('div');
+                info.className = 'file-info';
+
+                const name = document.createElement('div');
+                name.className = 'file-name';
+                name.textContent = file.name;
+                info.appendChild(name);
+
+                const meta = document.createElement('div');
+                meta.className = 'file-meta';
+                meta.textContent = file.size !== null ? `${file.size} bytes` : '';
+                info.appendChild(meta);
+
+                li.appendChild(info);
+                ul.appendChild(li);
+            });
+
+            app.appendChild(ul);
+        }
+
+        render();
+    </script>
+</body>
+</html>

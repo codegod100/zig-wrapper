@@ -22,18 +22,18 @@ pub fn build(b: *std.Build) void {
     // =========================================================================
     // Create root module with target and optimize
     const root_mod = b.createModule(.{
-        .root_source_file = b.path("test_app.zig"),
+        .root_source_file = b.path("app_final.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    // Add wry wrapper module import
-    const wry_module = b.createModule(.{
-        .root_source_file = b.path("wry.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    root_mod.addImport("wry", wry_module);
+    // Add wry wrapper module import - DISABLED since we use inline code
+    // const wry_module = b.createModule(.{
+    //     .root_source_file = b.path("wry.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // root_mod.addImport("wry", wry_module);
 
     const exe = b.addExecutable(.{
         .name = "wry_window_app",

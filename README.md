@@ -78,7 +78,29 @@ The dynamic linking approach used here is:
 
 ## Distribution
 
-When distributing your app, you need to ship:
+### AppImage Distribution
+
+The easiest way to distribute the application is using the included AppImage:
+
+```bash
+# Build (after running zig build)
+./build-appimage.sh
+
+# The AppImage will be created as:
+# wry-zig-wrapper-x86_64.AppImage
+
+# Run the AppImage:
+./wry-zig-wrapper-x86_64.AppImage
+```
+
+The AppImage requires the system to have GTK3 and WebKitGTK installed:
+- Ubuntu/Debian: `sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0`
+- Fedora: `sudo dnf install gtk3 webkit2gtk4.1`
+- Arch: `sudo pacman -S gtk3 webkit2gtk-4.1`
+
+### Manual Distribution
+
+When distributing your app manually, you need to ship:
 
 1. The Zig executable: `zig-out/bin/wry_window_app`
 2. The Rust library: `zig-out/lib/libwry_zig_wrapper.so`

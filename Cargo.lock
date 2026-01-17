@@ -2621,6 +2621,7 @@ name = "wry-zig-wrapper"
 version = "0.1.0"
 dependencies = [
  "gtk",
+ "once_cell",
  "tao",
  "wry",
 ]
