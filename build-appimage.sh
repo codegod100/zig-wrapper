@@ -69,7 +69,15 @@ cp "$APPDIR/wry-zig-wrapper.svg" "$APPDIR/usr/share/icons/hicolor/256x256/apps/"
 
 # Build AppImage
 echo "Building AppImage..."
-/tmp/appimagetool "$APPDIR" "$APPIMAGE"
+if [ -e /dev/fuse ] && [ -r /dev/fuse ]; then
+    /tmp/appimagetool "$APPDIR" "$APPIMAGE"
+else
+    APPIMAGETOOL_EXTRACT_DIR="/tmp/appimagetool-extract"
+    rm -rf "$APPIMAGETOOL_EXTRACT_DIR"
+    /tmp/appimagetool --appimage-extract > /dev/null
+    mv squashfs-root "$APPIMAGETOOL_EXTRACT_DIR"
+    "$APPIMAGETOOL_EXTRACT_DIR/AppRun" "$APPDIR" "$APPIMAGE"
+fi
 
 echo "AppImage created: $APPIMAGE"
 echo "Test with: ./$APPIMAGE"

@@ -94,4 +94,24 @@ pub fn build(b: *std.Build) void {
     const run_local_step = b.step("run-local", "Run app (sets LD_LIBRARY_PATH automatically)");
     run_local_step.dependOn(b.getInstallStep());
     run_local_step.dependOn(&run_local_cmd.step);
+
+    // =========================================================================
+    // AppImage Packaging
+    // =========================================================================
+    const appimage_mod = b.createModule(.{
+        .root_source_file = b.path("tools/appimage.zig"),
+        .target = b.graph.host,
+        .optimize = optimize,
+    });
+
+    const appimage_tool = b.addExecutable(.{
+        .name = "appimage_tool",
+        .root_module = appimage_mod,
+    });
+
+    const appimage_run = b.addRunArtifact(appimage_tool);
+    appimage_run.step.dependOn(b.getInstallStep());
+
+    const appimage_step = b.step("appimage", "Build AppImage package");
+    appimage_step.dependOn(&appimage_run.step);
 }

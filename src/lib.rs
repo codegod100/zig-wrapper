@@ -52,13 +52,17 @@ pub extern "C" fn wry_create_and_run_with_ipc(url: *const c_char, callback: Opti
     use tao::window::WindowBuilder;
 
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new()
+        .with_title("File Browser")
+        .build(&event_loop)
+        .unwrap();
 
     let mut webview_builder = if is_html {
         WebViewBuilder::new().with_html(&url_str)
     } else {
         WebViewBuilder::new().with_url(&url_str)
     };
+    webview_builder = webview_builder.with_devtools(true);
 
     if let Some(cb) = callback {
         webview_builder = webview_builder.with_ipc_handler(move |msg| {
@@ -83,11 +87,25 @@ pub extern "C" fn wry_create_and_run_with_ipc(url: *const c_char, callback: Opti
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
-        if let tao::event::Event::WindowEvent {
-            event: tao::event::WindowEvent::CloseRequested,
-            ..
-        } = event {
-            *control_flow = ControlFlow::Exit;
+        if let tao::event::Event::WindowEvent { event, .. } = event {
+            match event {
+                tao::event::WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit;
+                }
+                tao::event::WindowEvent::MouseInput {
+                    state: tao::event::ElementState::Pressed,
+                    button: tao::event::MouseButton::Right,
+                    ..
+                } => {
+                    #[cfg(any(debug_assertions, feature = "devtools"))]
+                    if let Ok(guard) = WEBVIEW.lock() {
+                        if let Some(wrapper) = guard.as_ref() {
+                            wrapper.0.open_devtools();
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     });
 }

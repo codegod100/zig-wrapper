@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=Wry Zig Wrapper
-Comment=File Browser built with Zig and Wry
-Exec=wry_zig_wrapper
-Icon=wry-zig-wrapper
-Type=Application
-Categories=Utility;FileTools;
-Terminal=false
-StartupNotify=true
