@@ -5,10 +5,12 @@ use once_cell::sync::Lazy;
 
 pub type IpcCallback = extern "C" fn(*const c_char);
 
+// WebView isn't Sync/Send, but we access it behind a Mutex from a single thread.
 struct UnsafeSync<T>(T);
 unsafe impl<T> Sync for UnsafeSync<T> {}
 unsafe impl<T> Send for UnsafeSync<T> {}
 
+// Stored so `wry_eval` can inject JS after the webview is created.
 static WEBVIEW: Lazy<Mutex<Option<UnsafeSync<wry::WebView>>>> = Lazy::new(|| Mutex::new(None));
 
 #[no_mangle]
@@ -44,7 +46,7 @@ pub extern "C" fn wry_create_and_run_with_ipc(url: *const c_char, callback: Opti
         }
     };
     
-    // Check if it's HTML content (heuristic)
+    // Heuristic to decide between raw HTML vs URL.
     let is_html = url_str.trim_start().starts_with("<!DOCTYPE") || url_str.trim_start().starts_with("<html");
 
     use wry::WebViewBuilder;
@@ -62,6 +64,7 @@ pub extern "C" fn wry_create_and_run_with_ipc(url: *const c_char, callback: Opti
     } else {
         WebViewBuilder::new().with_url(&url_str)
     };
+    // Enable devtools so right-click can open the inspector.
     webview_builder = webview_builder.with_devtools(true);
 
     if let Some(cb) = callback {
@@ -97,6 +100,7 @@ pub extern "C" fn wry_create_and_run_with_ipc(url: *const c_char, callback: Opti
                     button: tao::event::MouseButton::Right,
                     ..
                 } => {
+                    // Right-click opens devtools in debug builds (or with feature).
                     #[cfg(any(debug_assertions, feature = "devtools"))]
                     if let Ok(guard) = WEBVIEW.lock() {
                         if let Some(wrapper) = guard.as_ref() {
